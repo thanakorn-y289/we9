@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#9a2f3f">
+  <title>WE9 ระบบตรวจระเบียบวินัย · โรงเรียนปากช่อง</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="apple-touch-icon" href="logo.png">
+  <!-- ปุ่มเข้าสู่ระบบด้วย Google — skill pcschool-google-login (โค้ดชุดเดียวกับ /ask /doc /senddoc) -->
+  <script>
+    // เปิดลิงก์จากแอป LINE/Facebook/Instagram/TikTok → เด้งไปเบราว์เซอร์อัตโนมัติ (เข้าด้วย Google ในเบราว์เซอร์ของแอปไม่ได้)
+    //   LINE: ?openExternalBrowser=1 · Android: intent เปิด Chrome · iPhone: x-safari-https (iOS 17 ขึ้นไป)
+    //   ?ext=1 = เคยเด้งแล้ว (กันวนเมื่อเปิดเบราว์เซอร์ไม่ได้)
+    var IN_APP = /\bLine\/|FBAN|FBAV|FB_IAB|Instagram|BytedanceWebview|musical_ly/i.test(navigator.userAgent);
+    function openExternal() {
+      var ua = navigator.userAgent, u = new URL(location.href);
+      if (/\bLine\//i.test(ua)) { u.searchParams.set('openExternalBrowser', '1'); location.replace(u.toString()); return; }
+      u.searchParams.set('ext', '1');
+      if (/Android/i.test(ua)) location.href = 'intent://' + u.host + u.pathname + u.search + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u.toString()) + ';end';
+      else if (/iPhone|iPad|iPod/i.test(ua)) location.href = 'x-safari-' + u.toString();
+    }
+    if (IN_APP && !/[?&](openExternalBrowser|ext)=1/.test(location.search)) openExternal();
+  </script>
+  <script src="https://accounts.google.com/gsi/client" async onload="window.gReady && window.gReady()"></script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #fcf4f6; overflow: hidden; }
+    #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+    #loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+      background: linear-gradient(180deg, #fcf4f6, #fff 55%, #f5f7fa); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; color: #7b2230; transition: opacity .35s; z-index: 10; }
+    #loader.off { opacity: 0; pointer-events: none; }
+    #loader i { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #9a2f3f; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ปุ่ม Google วางทับช่อง #gSlot ในการ์ดเข้าสู่ระบบของแอปตามพิกัดที่แอปส่งมา
+       ปุ่มต้องอยู่หน้านี้ เพราะ Google รับปุ่มเฉพาะโดเมนที่ลงทะเบียน (กรอบ Apps Script ลงทะเบียนไม่ได้) */
+    #gfloat { display: none; position: fixed; z-index: 5; align-items: center; justify-content: center; background: #fff; border-radius: 999px; }
+    #gfloat.on { display: flex; }
+    /* ปุ่มสำรองเมื่อปุ่ม Google ไม่ขึ้น (เบราว์เซอร์ในแอป LINE/Facebook) */
+    #gfb { width: 100%; height: 40px; border: 1px solid #dadce0; border-radius: 999px; background: #fff; color: #3c4043;
+      font: 500 14px/1 system-ui, sans-serif; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+    #gfb .gfb-g { font-weight: 700; color: #4285f4; font-size: 16px; }
+    /* พิมพ์เอกสาร: แอปส่งหน้าเอกสารมาให้หน้านี้พิมพ์ (พิมพ์จากกรอบ Apps Script ใน iPad/มือถือ ไม่เสถียร และติดแถบของ Google) */
+    #print-root { display: none; }
+    /* หน้านี้ล็อกความสูง 100% + ซ่อนส่วนเกิน (ไว้ครอบแอป) → ตอนพิมพ์ต้องปลด ไม่งั้นได้แค่หน้าแรก */
+    @media print {
+      html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+      #app, #loader, #gfloat, #pbar { display: none !important; }
+    }
+    #pbar { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(15,23,42,.45); padding: 20px;
+      font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    #pbar.on { display: flex; }
+    #pbar > div { background: #fff; border-radius: 18px; padding: 22px 20px 18px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 16px 44px rgba(0,0,0,.2); }
+    #pbar b { display: block; font-size: 17px; color: #26323f; margin-bottom: 4px; }
+    #pbar p { margin: 0 0 16px; color: #6b7684; font-size: 14px; }
+    #pbar button { height: 44px; border-radius: 12px; font: 600 15px system-ui, sans-serif; cursor: pointer; padding: 0 18px; }
+    #pbar .go { background: #9a2f3f; color: #fff; border: 0; width: 100%; margin-bottom: 8px; }
+    #pbar .no { background: #fff; color: #3d4a58; border: 1px solid #d5dae1; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="loader"><img src="logo.png" alt="" height="64"><i></i>กำลังเปิดระบบตรวจระเบียบวินัย…</div>
+  <!-- ลิงก์ Web app (Deploy → Manage deployments → Web app URL) — เปลี่ยนเมื่อสร้าง deployment ใหม่ (ปกติใช้ Edit → New version จึงไม่ต้องเปลี่ยน) -->
+  <iframe id="app" title="WE9 ระบบตรวจระเบียบวินัย" allow="clipboard-write"
+          src="https://script.google.com/a/macros/pcschool.ac.th/s/AKfycbwRTqfgzkMXeFB1LJ8OxTCMrTWQUNdnea9pmIM7GDYq6iBxZskYb8wM-KBvC6Hrjh1CRw/exec"></iframe>
+  <div id="pbar" role="dialog" aria-modal="true"><div><b>เอกสารพร้อมพิมพ์</b><p id="pbar-msg">กดปุ่มด้านล่างเพื่อเปิดหน้าพิมพ์</p>
+    <button type="button" class="go" id="pbar-go">พิมพ์เอกสาร</button><button type="button" class="no" id="pbar-no">ปิด</button></div></div>
+  <div id="print-root"></div>
+  <div id="gfloat" role="region" aria-label="เข้าสู่ระบบด้วย Google"><div id="gbtn"></div><button type="button" id="gfb" style="display:none"></button></div>
+  <script>
+    var link = document.getElementById('app');
+    // Safari: หน้านี้ต้องมีตัวฟังการแตะ ไม่งั้น Safari ส่งการลากลงให้แอปในกรอบไม่ครบ → ลากรีโหลดไม่ได้ (ทดสอบแล้ว: มีตัวฟัง = ได้)
+    ['touchstart', 'touchmove', 'touchend'].forEach(function (t) { window.addEventListener(t, function () { }, { passive: true }); });
+    // โหมดตรวจสอบการลากรีโหลด: ?debug=ptr → ส่งต่อให้แอป + แถบบนจอของหน้านี้
+    var WDBG = /[?&]debug=ptr\b/.test(location.search) ? { c: {} } : null;
+    function wDbg(k, v) {
+      if (!WDBG) return;
+      WDBG.c[k] = v === undefined ? (WDBG.c[k] || 0) + 1 : v;
+      WDBG.el.textContent = 'wrap  ' + Object.keys(WDBG.c).map(function (x) { return x + '=' + WDBG.c[x]; }).join('  ');
+    }
+    if (WDBG) {
+      link.src = link.src + '?debug=ptr';
+      WDBG.el = document.createElement('div');
+      WDBG.el.style.cssText = 'position:fixed;left:8px;right:8px;top:8px;z-index:99;background:rgba(0,0,0,.85);color:#facc15;font:12px/1.5 monospace;padding:6px 8px;border-radius:8px;pointer-events:none;white-space:pre-wrap;word-break:break-all';
+      document.body.appendChild(WDBG.el);
+      wDbg('ua', /CriOS/.test(navigator.userAgent) ? 'chrome-ios' : /Safari/.test(navigator.userAgent) && /AppleWebKit/.test(navigator.userAgent) ? 'safari?' : 'other');
+      ['touchstart', 'touchmove', 'touchend'].forEach(function (t) { window.addEventListener(t, function () { wDbg(t); }, { passive: true }); });
+    }
+    link.addEventListener('load', function () { document.getElementById('loader').classList.add('off'); });
+    setTimeout(function () { document.getElementById('loader').classList.add('off'); }, 12000);
+
+    /*
+     * ปุ่มเข้าสู่ระบบด้วย Google — คู่กับ GSSO ใน AppSso.html และ googleLogin_ ใน Code.gs
+     *   แอป → หน้านี้ { tes:'auth', state:'login'|'in'|'logout' } / { tes:'gslot', rect } (ช่องในการ์ด, null = ซ่อน)
+     *   หน้านี้ → แอป { tes:'gwrap' } (มีปุ่มจริง แอปจึงเว้นช่อง) / { tes:'gcred', credential, selectBy } (ผลจาก Google)
+     * ส่ง credential กลับไปที่หน้าต่างที่ส่งข้อความมาเท่านั้น (ev.source + ev.origin ของกรอบ Apps Script)
+     */
+    // Client ID ของ Google — ใช้ GitHub/Client ID ของตัวเอง: เปลี่ยนบรรทัดนี้ และตั้ง GOOGLE_CLIENT_ID ใน Script Properties ให้ตรงกัน
+    var GOOGLE_CLIENT_ID = '258938261280-kb26o3gnnqkt434pm2m67toako5jgvu8.apps.googleusercontent.com';
+    var gApp = null, gOrigin = '', gInit = false, gWant = false, gNoAuto = false, gPrompted = false;
+    var gRect = null, gBtnW = 0;
+    var gFloat = document.getElementById('gfloat');
+
+    function gReadyNow() { return !!(window.google && google.accounts && google.accounts.id); }
+    function gInitOnce() {
+      if (gInit || !gReadyNow()) return gInit;
+      gInit = true;
+      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: gCallback, auto_select: true,
+        hd: 'pcschool.ac.th', context: 'signin', ux_mode: 'popup', use_fedcm_for_prompt: true, cancel_on_tap_outside: false });
+      return true;
+    }
+
+    // เบราว์เซอร์ในแอป (LINE/Facebook/Instagram) Google ไม่วาดปุ่ม → ปุ่ม "เปิดในเบราว์เซอร์"
+    var gInApp = IN_APP;
+    var gFbTimer = 0;
+    function gFallback(kind) {
+      var fb = document.getElementById('gfb'), btn = document.getElementById('gbtn');
+      if (!kind) { fb.style.display = 'none'; btn.style.display = ''; return; }
+      btn.style.display = 'none'; fb.style.display = 'flex';
+      if (kind === 'open') {
+        fb.innerHTML = '<span class="gfb-g">G</span>เปิดในเบราว์เซอร์เพื่อเข้าด้วย Google';
+        fb.onclick = function () {
+          openExternal();
+          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) setTimeout(function () { alert('ถ้ายังไม่เด้ง: กดปุ่ม ⋯ หรือ ↗ มุมจอ แล้วเลือก “เปิดใน Safari”'); }, 1500);
+        };
+      } else {
+        fb.innerHTML = '<span class="gfb-g">G</span>ลงชื่อเข้าใช้ด้วย Google';
+        fb.onclick = function () { if (gReadyNow()) google.accounts.id.prompt(); else location.reload(); };
+      }
+    }
+
+    function gPlace() {
+      if (!gWant || !gRect) { gFloat.classList.remove('on'); return; }
+      var fr = link.getBoundingClientRect();
+      gFloat.style.left = (fr.left + gRect.x) + 'px';
+      gFloat.style.top = (fr.top + gRect.y) + 'px';
+      gFloat.style.width = gRect.w + 'px';
+      gFloat.style.height = gRect.h + 'px';
+      gFloat.classList.add('on');
+      if (gInApp) { gFallback('open'); return; }
+      if (!gInitOnce()) {
+        clearTimeout(gFbTimer);
+        gFbTimer = setTimeout(function () { if (gWant && !gInitOnce()) gFallback('prompt'); }, 4000);
+        return;
+      }
+      var w = Math.max(200, Math.min(400, Math.floor(gRect.w)));
+      if (Math.abs(w - gBtnW) > 4) {
+        gBtnW = w;
+        gFallback('');
+        google.accounts.id.renderButton(document.getElementById('gbtn'), { theme: 'outline', size: 'large',
+          text: 'signin_with', shape: 'pill', locale: 'th', width: w });
+        clearTimeout(gFbTimer);
+        gFbTimer = setTimeout(function () {
+          if (gWant && !(document.getElementById('gbtn').getBoundingClientRect().height > 10)) gFallback('prompt');
+        }, 3000);
+      }
+      if (!gNoAuto && !gPrompted) { gPrompted = true; google.accounts.id.prompt(); }
+    }
+    window.gReady = gPlace;
+    window.addEventListener('resize', gPlace);
+    // iPhone: แถบที่อยู่ยุบ/ขยาย หรือหน้าเลื่อน = จอที่มองเห็นเปลี่ยน → วางปุ่มใหม่
+    if (window.visualViewport) { visualViewport.addEventListener('resize', gPlace); visualViewport.addEventListener('scroll', gPlace); }
+    // Safari: ลากลงแล้วทั้งหน้านี้เด้ง (scrollY ติดลบ) แทนที่แอปจะได้การลาก → เด้งลึกพอแล้วปล่อย = โหลดใหม่ทั้งหน้า
+    var wMin = 0;
+    function wReload() { document.getElementById('loader').classList.remove('off'); location.reload(); }
+    window.addEventListener('scroll', function () {
+      var y = window.scrollY || window.pageYOffset || 0;
+      wDbg('scroll', Math.round(y)); if (y < wDbg.min || wDbg.min === undefined) { wDbg.min = y; wDbg('min', Math.round(y)); }
+      if (y < 0) { wMin = Math.min(wMin, y); return; }
+      if (wMin <= -60) { wMin = 0; wReload(); return; }
+      wMin = 0;
+      if (y > 0) window.scrollTo(0, 0);
+      gPlace();
+    }, { passive: true });
+
+    // ---- พิมพ์เอกสาร (แอป → { tes:'print', html, css } · css = กฎ @media print ของแอป) ----
+    var pRoot = document.getElementById('print-root'), pBar = document.getElementById('pbar'), pStyle = null;
+    var pTouch = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    function pFonts() {
+      if (!document.getElementById('pfont')) {
+        var l = document.createElement('link'); l.id = 'pfont'; l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap';
+        document.head.appendChild(l);
+      }
+      if (!document.fonts || !document.fonts.load) return Promise.resolve();
+      return Promise.race([Promise.all([document.fonts.load('400 12pt Sarabun'), document.fonts.load('700 12pt Sarabun')]),
+        new Promise(function (ok) { setTimeout(ok, 4000); })]).catch(function () { });
+    }
+    function pPrepare(html, css) {
+      if (!pStyle) { pStyle = document.createElement('style'); document.head.appendChild(pStyle); }
+      pStyle.textContent = css;
+      pRoot.innerHTML = html;
+      var imgs = Array.prototype.slice.call(pRoot.querySelectorAll('img')).map(function (im) { return im.decode ? im.decode().catch(function () { }) : null; });
+      var go = document.getElementById('pbar-go');
+      go.disabled = true; go.textContent = 'กำลังเตรียม…';
+      if (pTouch) pBar.classList.add('on'); // iPad/มือถือ: ต้องกดปุ่มเอง เบราว์เซอร์จึงยอมเปิดหน้าพิมพ์
+      Promise.all(imgs.concat([pFonts()])).then(function () {
+        go.disabled = false; go.textContent = 'พิมพ์เอกสาร';
+        if (!pTouch) setTimeout(function () { window.print(); }, 150);
+      });
+    }
+    document.getElementById('pbar-go').onclick = function () { window.print(); };
+    document.getElementById('pbar-no').onclick = function () { pBar.classList.remove('on'); pRoot.innerHTML = ''; };
+    window.addEventListener('afterprint', function () { pBar.classList.remove('on'); pRoot.innerHTML = ''; });
+
+    function gCallback(resp) {
+      if (!resp || !resp.credential || !gApp) return;
+      gRect = null; gFloat.classList.remove('on');
+      gApp.postMessage({ tes: 'gcred', credential: resp.credential, selectBy: String(resp.select_by || '') }, gOrigin);
+    }
+
+    window.addEventListener('message', function (ev) {
+      var d = ev.data;
+      // แอปขอโหลดใหม่ทั้งหน้า (ลากหน้าจอลงในมือถือ)
+      if (d && d.tes === 'reload') wDbg('reloadMsg', String(ev.origin).slice(8, 20));
+      if (d && d.tes === 'reload' && /\.googleusercontent\.com$/.test(String(ev.origin))) {
+        wReload();
+        return;
+      }
+      if (d && d.tes === 'print' && /\.googleusercontent\.com$/.test(String(ev.origin))) {
+        try { ev.source.postMessage({ tes: 'printing' }, ev.origin); } catch (e) { }
+        pPrepare(String(d.html || ''), String(d.css || ''));
+        return;
+      }
+      if (!d || (d.tes !== 'auth' && d.tes !== 'gslot') || !/\.googleusercontent\.com$/.test(String(ev.origin))) return;
+      gApp = ev.source; gOrigin = ev.origin;
+      if (d.tes === 'gslot') { gRect = d.rect || null; gPlace(); return; }
+      if (d.state === 'login') {
+        gWant = true;
+        try { gApp.postMessage({ tes: 'gwrap' }, gOrigin); } catch (e) { }
+        gPlace();
+      } else {
+        gWant = false; gRect = null; gPrompted = false; gBtnW = 0;
+        gFloat.classList.remove('on');
+        try { google.accounts.id.cancel(); } catch (e) { }
+        if (d.state === 'logout') { gNoAuto = true; try { google.accounts.id.disableAutoSelect(); } catch (e) { } }
+      }
+    });
+  </script>
+</body>
+</html>
